@@ -865,23 +865,50 @@ convert.hexstream <-function(stream){
 #'
 #' @keywords internal
 
+# ========================================
+# REFACTORED VERSION OF CONVERT.INTSTREAM
+# ========================================
+
 convert.intstream <- function(stream){
-
-  maxint <- 2^(12 - 1)
-  stream1 = stream - 48 - 7 * (stream > 64)
-  packet<- drop(matrix(stream1, ncol = 3, byrow = T) %*% 16^(3: 1 - 1))
-  packet[packet>=maxint] <- -2*maxint + (packet[packet>=maxint] )
-  packet<-matrix(packet,nrow=4)
-
-  # Again light packet needs a higher maxint value than the rest of the data.
-  maxint1 <- 2^(12)
-  stream2 = stream - 48 - 7 * (stream > 64)
-  packet1<- drop(matrix(stream2, ncol = 3, byrow = T) %*% 16^(3: 1 - 1))
-  packet1[packet1>=maxint1] <- -2*maxint1 + (packet1[packet1>=maxint1] )
-  packet1<-matrix(packet1,nrow=4)
-
-  light = abs(floor(packet1[4,] / 4 -> ltmp)) # Adding in the absolute value here to ensure no negatives
-  rbind(packet[1:3,], light, (ltmp-light) >0.49)
+  
+  # Constants for 12-bit signed conversion
+  maxint_signed <- 2048 # 2^(12-1)
+  two_maxint_signed <- 4096 # 2 * maxint_signed
+  
+  # 1. Calculate combined 12-bit raw values directly from stream bytes (once)
+  #    'stream - 48 - 7 * (stream > 64)' converts ASCII hex char codes to numeric 0-15
+  #    Matrix multiplication combines 3 hex digits using powers of 16 (16^2, 16^1, 16^0)
+  packet_raw <- drop(matrix(stream - 48 - 7 * (stream > 64), ncol = 3, byrow = TRUE) %*% c(256, 16, 1))
+  
+  # 2. Reshape the raw 12-bit values into 4 rows (XYZ, Light/Button info)
+  packet_mat <- matrix(packet_raw, nrow = 4)
+  
+  # 3. Extract XYZ components (first 3 rows)
+  xyz_raw = packet_mat[1:3, , drop = FALSE]
+  
+  # 4. Apply signed 12-bit correction (2's complement) to XYZ values
+  #    Values >= 2048 are negative in 12-bit signed representation
+  needs_correction <- xyz_raw >= maxint_signed
+  xyz_raw[needs_correction] <- xyz_raw[needs_correction] - two_maxint_signed
+  
+  # 5. Extract the 4th component (contains raw unsigned 12-bit value for Light/Button)
+  light_button_raw = packet_mat[4, ]
+  
+  # 6. Calculate intermediate value for light/button logic (as per original logic)
+  ltmp = light_button_raw / 4
+  
+  # 7. Calculate light value (as per original logic: take floor, then abs)
+  #    abs() likely redundant if light_button_raw is guaranteed >= 0, but kept for consistency
+  light = abs(floor(ltmp))
+  
+  # 8. Calculate button state (as per original logic)
+  #    Checks if the fractional part of the division by 4 is >= 0.5
+  #    This corresponds to checking if (light_button_raw mod 4) is 2 or 3
+  button = (ltmp - light) > 0.49
+  
+  # 9. Combine corrected XYZ, calculated light, and button state into the final matrix
+  #    Ensure button state is numeric (0 or 1)
+  rbind(xyz_raw, light, as.numeric(button))
 }
 
 
