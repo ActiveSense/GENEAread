@@ -185,8 +185,6 @@ read.bin <- function(binfile,
                      mmap.load = (.Machine$sizeof.pointer >= 8),
                      pagerefs = TRUE, ...){
 
-  print("IS THIS WORKING")
-  
   #### 1. Setting envirnoment and variables ####
 
   invisible(gc()) # garbage collect
