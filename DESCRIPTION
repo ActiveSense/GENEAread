@@ -1,7 +1,7 @@
 Package: GENEAread
 Type: Package
 Title: Package for Reading Binary Files
-Version: 2.0.10
+Version: 2.0.10-activesense
 Date: 2024-03-05
 Authors@R: c(
     person("Zhou", "Fang", role = "aut"),
